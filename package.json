@@ -1,6 +1,6 @@
 {
   "name": "sales-prep-backend",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Sales Call Prep — Licence verification & Stripe webhooks",
   "main": "index.js",
   "scripts": {
