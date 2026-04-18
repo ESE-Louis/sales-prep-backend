@@ -59,49 +59,79 @@ function validateLicence(key) {
   return /^ESE-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(key.toUpperCase());
 }
 
+// ─── CALL TYPE CONFIGS ───
+const callTypeConfig = {
+  discovery: {
+    label: 'a first-call discovery call',
+    bullets: [
+      { category: 'Background', instruction: 'Their current role, company, and relevant career history' },
+      { category: 'Likely Pain Point', instruction: 'The biggest business challenge they probably face right now that the seller could help solve' },
+      { category: 'Buying Trigger', instruction: 'A specific recent event, role change, or signal that makes them likely to be open to a conversation now' },
+      { category: 'Discovery Angle', instruction: 'The single best qualifying question to ask to uncover their real pain and budget authority' },
+      { category: 'Your Angle', instruction: 'How to position the sellers value proposition specifically for this persons situation and company stage' }
+    ],
+    openerInstruction: 'A natural first-call opener that references something specific from their background and leads into a qualifying question'
+  },
+  demo: {
+    label: 'a product demo call',
+    bullets: [
+      { category: 'Background', instruction: 'Their role and what decisions they influence or own in the buying process' },
+      { category: 'Use Case Fit', instruction: 'The most likely way they would use the product based on their role and company — be specific' },
+      { category: 'Buying Criteria', instruction: 'What they will likely evaluate the product on — features, ROI, integration, ease of use, etc' },
+      { category: 'Likely Objection', instruction: 'The single most likely objection or concern they will raise during the demo and how to pre-empt it' },
+      { category: 'Demo Focus', instruction: 'Which specific capability or outcome to emphasise in the demo to resonate most with this person' }
+    ],
+    openerInstruction: 'A demo call opener that confirms their priorities before starting and sets up the agenda around their specific use case'
+  },
+  followup: {
+    label: 'a follow-up sales call',
+    bullets: [
+      { category: 'Background', instruction: 'Their role and where they likely sit in the decision making process' },
+      { category: 'Where We Left Off', instruction: 'Based on their profile and typical buying journey, what stage the deal is probably at and what was likely discussed previously' },
+      { category: 'Likely Hesitation', instruction: 'What is probably making them hesitate or slow down — internal politics, budget, competing priorities' },
+      { category: 'Next Step To Push', instruction: 'The specific next step to push for in this call to advance the deal — proposal, pilot, intro to decision maker, etc' },
+      { category: 'Your Angle', instruction: 'How to re-energise their interest and create urgency without being pushy — reference their specific business goals' }
+    ],
+    openerInstruction: 'A follow-up opener that re-establishes rapport, references the previous conversation, and moves straight to advancing the deal'
+  }
+};
+
 // ─── GENERATE BRIEF ───
 async function generateBrief(url, context, callType, sellerName, pageContent) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('Anthropic API key not configured');
 
-  const callLabels = {
-    discovery: 'a first-call discovery call',
-    demo: 'a product demo call',
-    followup: 'a follow-up sales call'
-  };
+  const config = callTypeConfig[callType] || callTypeConfig.discovery;
 
   const sellerCtx = sellerName
     ? 'The salesperson is: ' + sellerName + '.'
     : 'The salesperson is an enterprise B2B sales professional.';
 
-  // Use live page data if available, otherwise infer from URL
-  let profileSection;
-  if (pageContent && pageContent.length > 100) {
-    profileSection = 'LIVE PROFILE DATA (use this to extract name, role, company, career history):\n"""\n' + pageContent + '\n"""';
-  } else {
-    profileSection = 'PROFILE URL: ' + url + '\nNote: Limited profile data available. Infer what you can from the URL and name. Make reasonable assumptions based on their likely role and industry — still generate a full, useful brief.';
-  }
+  const profileSection = pageContent && pageContent.length > 100
+    ? 'LIVE PROFILE DATA:\n"""\n' + pageContent + '\n"""'
+    : 'PROFILE URL: ' + url + '\nInfer name, role and company from the URL. Make intelligent assumptions to generate a useful brief.';
 
-  const prompt = 'Generate a sales call prep brief for ' + (callLabels[callType] || callLabels.discovery) + '.\n\n' +
+  const bulletInstructions = config.bullets.map((b, i) =>
+    '    {"category": "' + b.category + '", "text": "' + b.instruction + '"}'
+  ).join(',\n');
+
+  const prompt = 'Generate a sales call prep brief for ' + config.label + '.\n\n' +
     profileSection + '\n' +
     (context ? 'Additional context: ' + context + '\n' : '') +
     sellerCtx + '\n\n' +
     'IMPORTANT:\n' +
-    '- Determine gender from name and use correct pronouns throughout\n' +
-    '- If profile data is limited, make intelligent assumptions based on available signals\n' +
-    '- Always return a complete, useful brief — never refuse or return empty fields\n\n' +
+    '- Use the correct gender pronouns based on their name\n' +
+    '- Make each bullet specific and actionable — not generic\n' +
+    '- Tailor every bullet to THIS call type (' + config.label + ') not just general background\n' +
+    '- Always return a complete brief even with limited profile data\n\n' +
     'Return ONLY this JSON:\n' +
     '{\n' +
-    '  "name": "Their actual full name",\n' +
+    '  "name": "Their full name",\n' +
     '  "role": "Current role and company",\n' +
     '  "bullets": [\n' +
-    '    {"category": "Background", "text": "Current role, company, and notable career history"},\n' +
-    '    {"category": "Likely Pain Point", "text": "A specific challenge for their profession"},\n' +
-    '    {"category": "Buying Trigger", "text": "What might make them open to a conversation now"},\n' +
-    '    {"category": "Their Priority", "text": "What they care about most professionally"},\n' +
-    '    {"category": "Your Angle", "text": "How the seller can genuinely help this person"}\n' +
+    config.bullets.map(b => '    {"category": "' + b.category + '", "text": "[' + b.instruction + ']"}').join(',\n') + '\n' +
     '  ],\n' +
-    '  "opener": "Natural 1-2 sentence opener referencing something real from their profile"\n' +
+    '  "opener": "[' + config.openerInstruction + ']"\n' +
     '}';
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -114,7 +144,7 @@ async function generateBrief(url, context, callType, sellerName, pageContent) {
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1000,
-      system: 'You are an expert enterprise sales strategist. Respond ONLY with valid JSON. No markdown, no preamble. Always generate a complete brief even with limited information.',
+      system: 'You are an expert enterprise sales strategist. Respond ONLY with valid JSON. No markdown, no preamble. Make every brief specific, actionable and tailored to the exact call type.',
       messages: [{ role: 'user', content: prompt }]
     })
   });
@@ -133,10 +163,10 @@ async function generateBrief(url, context, callType, sellerName, pageContent) {
 
 // ─── HEALTH ───
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '2.1.0' });
+  res.json({ status: 'ok', version: '2.2.0' });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Sales Prep API v2.1 running on port ' + PORT));
+app.listen(PORT, () => console.log('Sales Prep API v2.2 running on port ' + PORT));
 
 module.exports = app;
