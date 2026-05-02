@@ -87,8 +87,12 @@ app.post('/api/verify-licence', (req, res) => {
 
 // ─── VALIDATE LICENCE ───
 function validateLicence(key) {
-  if (!key || !key.startsWith('ESE-')) return false;
-  return /^ESE-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(key.toUpperCase());
+  if (!key) return false;
+  const upper = key.toUpperCase();
+  return /^ESE-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(upper) ||
+         /^PLG-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(upper);
+}
+
 }
 
 // ─── ANTHROPIC HELPER ───
