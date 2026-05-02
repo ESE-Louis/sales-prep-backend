@@ -93,7 +93,7 @@ function validateLicence(key) {
          /^PLG-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$/.test(upper);
 }
 
-}
+
 
 // ─── ANTHROPIC HELPER ───
 async function callAnthropic(prompt, system, maxTokens) {
